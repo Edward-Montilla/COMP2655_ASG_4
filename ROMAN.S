@@ -1,5 +1,5 @@
 ;----------------------Register Table---------------;
-git;	d0 = ONLY holds input and output data
+;	d0 = ONLY holds input and output data
 ;	d1 = ONLY holds 'error' values (0-7)
 ;	d2 = holds user input
 
@@ -10,12 +10,11 @@ git;	d0 = ONLY holds input and output data
 ; Constants
 
 ; Screen Controls:
-CR				equ			13
-LF				equ			10
+CR			equ			13
+LF			equ			10
 NULL			equ			0
 
-;
-    git push --set-upstream origin test
+
 
 ; Booleans
 
@@ -41,16 +40,21 @@ C_NULL			equ			'\0'
 QUIT			equ			'Q'
 
 ; initialize 
-				jsr			read_char
-				addq.b 		#3,d0
-				jsr			write_char
+			jsr			read_char
+			move.b			d0,d2
+			addq.b	 		#3,d2
+			move.b			d2,d0
+			jsr			write_char
+				
 
-run:			cmp			#QUIT,d2
-				beq			end_prog
-				jsr			read_char
-				addq.b 		#3,d0
-				jsr			write_char
-				bra			run
+run:			jsr			read_char
+			move.b			d0,d2
+			cmp			#QUIT,d2
+			beq			end_prog				
+			addq.b			#3,d2
+			jsr			write_char				
+			bra			run
+
 end_prog:		jsr			exit			
 
 ; Print opening lines
