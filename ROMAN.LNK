@@ -1,4 +1,4 @@
-input d:\ROMAN.BIN
-input d:\ROMAN_IO.BIN
-output d:\roman.tos
+input d:\A4PRIME\ROMAN.BIN
+input d:\A4PRIME\ROMAN_IO.BIN
+output d:\A4PRIME\roman.tos
 xdebug
