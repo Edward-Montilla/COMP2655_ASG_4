@@ -41,11 +41,11 @@ MAX_TIMES		equ			12	; int,  4 bytes
 ROMAN_SIZE		equ			14	; size of records
 
 ;------Program Specific Constants-----;
-MAX_ROMAN		equ			7
+MAX_ROMANS		equ			7
 MAX_STRING		equ			20
 NO_ERROR		equ			0
 MAX_DIGIT_COUNT	equ			3
-C_NULL			equ			'\0'
+C_NULL			equ			0
 QUIT			equ			'Q'
 
 				; Print Opening Lines:
@@ -102,7 +102,7 @@ init_vars:		; sum = 0
 				; r_last = MAX_ROMANS -1
 				lea			r_last,a2			; a2 holds address for `r_last`
 				clr.w		(a2)
-				move.b		#MAX_ROMAN-1,(a2)
+				move.b		#MAX_ROMANS-1,(a2)
 
 				; error = NO_ERROR
 				lea			error,a2			; a2 holds address for `error`
@@ -115,7 +115,8 @@ find_error:		; STM:::  string[s_index] != C_NULL && error == NO_ERROR
 				adda.w		d1,a1				; d1 = string[s_index]
 				move.b		(a1),d1
 				cmp.w		#C_NULL,d1
-				bne			check_error
+				beq			check_error
+				
 				lea			error,a3			; a3 holds 'error'
 				move.w		(a3),d2				; d2 = error
 				cmp.w		#NO_ERROR,d2
@@ -123,29 +124,54 @@ find_error:		; STM:::  string[s_index] != C_NULL && error == NO_ERROR
 				clr.w		d1
 				clr.w		d2
 
+				; while body: 
+				; r_index = MAX_ROMAN-1
+				lea			r_index,a2			; a2 points to r_index
+				move.w		#MAX_ROMANS-1,(a2)	; r_index now holds MAX_ROMANS-1
+				
 prt_reverse:	; STM::: (r_index >= 0 && string[s_index] != all_roman[r_index].digit)
+				move.w			(a2),d1			; d1 holds value of `r_index`
+				cmp.w			#0,d1
+				blt				invalid_digit
+				 
+				lea				s_index,a3		; a3 points to `s_index`
+				move.w			(a3),d2			; d2 holds value of `s_index`
+				
+				clr.l			d3
+				move.w			(a1,d2),d3		; d3 holds value of `string[s_index]`
+				cmp.w			DIGIT(a0,d1),d3
+				beq				invalid_digit
+				
+				; BDY::: r_index--
+				sub.b 		#1,(a2)
+				bra			prt_reverse
+				
+invalid_digit:	; STM:::: r_index < 0
+				cmp.w		#0,d1
+				bge			index_GT_last
+				
+				; BDY::: error = 1
+				lea			error,a3			
+				move.w		#1,(a3)
 
-; BDY::: r_index--
-				sub.b 		#1,d3
-				inv_rom_dgt:	; STM:::: r_index < 0
-; BDY::: error = 1
-inv_rom_dgt_else: ; STM::: else
-
-index_GT_last: ; STM::: r_index > r_last
-; BDY::: decisions
+index_GT_last: ; STM::: else if( r_index > r_last)
+				lea			r_last,a3			; a3 points to 'r_last`
+				cmp.w		(a3),d1
+				ble			index_LE_last
 
 out_of_order:	;STM::: (all_roman[r_index].subtractor_index != r_last) || (all_roman[r_last].count > 1)				else1a2b:
-		;BDY::: error = 2
+				move.w
+				
+				;BDY::: error = 2
 
-out_of_order_else: ; STM:::
-		; BDY::: sum = sum + all_roman[r_index].arab_value - 2 * all_roman[r_last].arrab_value
-		;		(all_roman[all_roman[r_index].subtractor_index].count)--
-		;		all_roman[r_index].count++
-		;		all_roman[r_index].modified = TRUE
-		;		all_roman[all_roman[r_index].subtractor_index].modifier = TRUE
-
-		;		all_roman[all_roman[r_index].subtractor_index].modifier = TRUE
-index_GT_last_else: ; STM::: else
+in_order: 		; STM:::
+				; BDY::: sum = sum + all_roman[r_index].arab_value - 2 * all_roman[r_last].arrab_value
+				;		(all_roman[all_roman[r_index].subtractor_index].count)--
+				;		all_roman[r_index].count++
+				;		all_roman[r_index].modified = TRUE
+				;		all_roman[all_roman[r_index].subtractor_index].modifier = TRUE
+				;		all_roman[all_roman[r_index].subtractor_index].modifier = TRUE
+index_LE_last: ; STM::: else
 
 
 find_error3:
