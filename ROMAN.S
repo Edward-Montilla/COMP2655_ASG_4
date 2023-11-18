@@ -10,8 +10,8 @@
 ;			ALSO holds the address for the 'sum' variable
 ;	a3 = ONLY holds address for `s_index` variable
 ;	a4 = ONLY holds address for `r_last` variable
-;	
-;	
+;
+;
 
 
 
@@ -48,60 +48,82 @@ MAX_DIGIT_COUNT	equ			3
 C_NULL			equ			'\0'
 QUIT			equ			'Q'
 
-; Print Opening Lines:
-				lea			open0,a2
-prt_open0:
-				move.b		(a2)+,d0
-				beq			prt_open3
+				; Print Opening Lines:
+				lea			intro,a5
+prt_intro:
+				move.b		(a5)+,d0
+				beq			prt_rst
 				jsr			write_char
-				bra			prt_open0
+				bra			prt_intro
 
-				lea			open3,a2
-prt_open3:	; prt_open3 to be called again every conversion
-				move.b		(a2)+,d0
-				beq			read_input
+				; prt_rst: Prints the rst_str to be called again every conversion
+
+prt_rst:		lea			rst_str,a5
+prt_loop:		move.b		(a5)+,d0
+				beq			start
 				jsr			write_char
-				bra			prt_open3			
+				bra			prt_loop
 
-; Read User Input
-				lea			string,a1
-start:	;scanf(format_string,string)
-				jsr			read_char
+				; Read User Input == scanf(format_string,string)
+start:			lea			all_roman,a0		; a0 holds all_roman
+				lea			string,a1			; a1 holds string
+
+				; Clear 'string'
+				move.b		#MAX_STRING+1,d1	; d1 holds length of 'string' acts as counter
+clr_str:		clr.b		(a1)+
+				dbra		d1,clr_str
+				clr.b		d1
+
+				; Read user Improved Roman Nnumeral notation
+				lea			string,a1			; a1 holds the start of the 'string'
+read_input:		jsr			read_char
 				cmp			#CR,d0
-				beq			while0
-				move.b		d0,(a0)+
+				beq			chk_quit
+				move.b		d0,(a1)+
 				bra			read_input
 
-chk_quit:	; STM::: while(string[0] != QUIT)
-				lea			string,a3			; Temporarily points to the 0th element of the string.
-				cmp.b		#QUIT,(a3)
-				clr.l		(a3)
+chk_quit:		; STM::: while(string[0] != QUIT)
+				lea			string,a1			; a1 holds string, points to 0th element of string
+				cmp.b		#QUIT,(a1)
 				beq			end_prog
-				cmp.b		#CR,(a3)			; Checks if user entered empty string
+				cmp.b		#CR,(a1)			; Checks if user entered empty string
+				beq			start
 
-			;Initialize variables
+				; Initialize variables
 ;-------------------------------UNTESTED,START--------------------------------;
-	init_vars:	;sum = 0
+init_vars:		; sum = 0
 				lea			sum,a2				; a2 holds address for `sum`
-				clr.l		(a2)
-				
-				;s_index = 0
-				lea			s_index,a2			; a3 holds address for `s_index`
-				clr.l		(a2)
-				
-				;r_last = MAX_ROMANS -1
-				lea			r_last,a2			; a2 holds address for `r_last`
-				clr.l		(a2)
-				move.b		MAX_ROMAN-1,(a2)
-				
-				;error = NO_ERROR
-				lea			error,a2			; a2 holds address for `error`
-				clr.l		(a2)
-				move.b		#NO_ERROR,(a2)
-			
-find_error:		; STM:::  string[s_index] != C_NULL && error == NO_ERROR
+				clr.w		(a2)
 
-prt_reverse:		; STM::: (r_index >= 0 && string[s_index] != all_roman[r_index].digit)			
+				; s_index = 0
+				lea			s_index,a2			; a2 holds address for `s_index`
+				clr.w		(a2)
+
+				; r_last = MAX_ROMANS -1
+				lea			r_last,a2			; a2 holds address for `r_last`
+				clr.w		(a2)
+				move.b		#MAX_ROMAN-1,(a2)
+
+				; error = NO_ERROR
+				lea			error,a2			; a2 holds address for `error`
+				clr.w		(a2)
+				move.b		#NO_ERROR,(a2)
+
+find_error:		; STM:::  string[s_index] != C_NULL && error == NO_ERROR
+				lea			s_index,a2			; a2 holds 's_index'
+				move.w		(a2),d1
+				adda.w		d1,a1				; d1 = string[s_index]
+				move.b		(a1),d1
+				cmp.w		#C_NULL,d1
+				bne			check_error
+				lea			error,a3			; a3 holds 'error'
+				move.w		(a3),d2				; d2 = error
+				cmp.w		#NO_ERROR,d2
+				bne			check_error
+				clr.w		d1
+				clr.w		d2
+
+prt_reverse:	; STM::: (r_index >= 0 && string[s_index] != all_roman[r_index].digit)
 
 ; BDY::: r_index--
 				sub.b 		#1,d3
@@ -115,16 +137,16 @@ index_GT_last: ; STM::: r_index > r_last
 out_of_order:	;STM::: (all_roman[r_index].subtractor_index != r_last) || (all_roman[r_last].count > 1)				else1a2b:
 		;BDY::: error = 2
 
-out_of_order_else: ; STM::: 
+out_of_order_else: ; STM:::
 		; BDY::: sum = sum + all_roman[r_index].arab_value - 2 * all_roman[r_last].arrab_value
 		;		(all_roman[all_roman[r_index].subtractor_index].count)--
 		;		all_roman[r_index].count++
 		;		all_roman[r_index].modified = TRUE
 		;		all_roman[all_roman[r_index].subtractor_index].modifier = TRUE
-		
+
 		;		all_roman[all_roman[r_index].subtractor_index].modifier = TRUE
 index_GT_last_else: ; STM::: else
-	
+
 
 find_error3:
 
@@ -151,10 +173,16 @@ else1: ; given digit is valid, print number
 
 while1a: ; clear array modifiers and counts
 
-re_prt:	; Reprints string: open3
+re_prt:
+				clr.l	d0
+				lea		rst_str,a3
+				move.b	(a3)+,d0
+				beq		rst_bra
+				jsr		write_char
+				bra		re_prt
 
-rst_bra: 		
-				bra 	start 
+rst_bra:
+				bra 	start
 ;-------------End_Untested---------------
 
 
@@ -174,7 +202,7 @@ intro:			dc.b		"This program converts numbers in Improved Roman notation to Arab
 				dc.b		CR,LF,"Input is limited to UPPER case Roman digits only"
 				dc.b		CR,LF,"To exit the program type only the Enter key.",NULL
 				even
-				
+
 rst_str:		dc.b		CR,LF, "Input a Roman number (Press 'Q' to exit): ",NULL
 
 error0:			dc.b		"Character at position ",NULL
@@ -185,7 +213,7 @@ error4:			dc.b		"combination of the modified prior digit and this digit is", CR,
 error5:			dc.b		"has exceeded the maximum occurences for this digit", NULL
 error_Def:		dc.b		"In error handling with an invalid error code", NULL
 				even
-				
+
 ; Program Vaiables:
 string:			ds.b		MAX_STRING+1
 				even
@@ -195,7 +223,7 @@ r_last:			ds.b		2
 r_index:		ds.b		2
 error:			ds.b		2
 				even
-				
+
 ; Array of Structures:
 all_roman: 		dc.w		'I',1,-1,0,FALSE,FALSE,MAX_DIGIT_COUNT
 				dc.w		'V',5,0,0,FALSE,FALSE,1
