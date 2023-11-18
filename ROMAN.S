@@ -1,3 +1,4 @@
+
 ;----------------------Register Table---------------;
 ;	d0 = ONLY holds input and output data
 ;	d1 = ONLY holds index values for 'all_roman' Array
@@ -34,7 +35,7 @@ FALSE			equ			0
 DIGIT			equ			0	; char, 1 byte + 1 pad, next field is a long
 ARAB_VAL		equ			2	; int,  4 bytes
 SUB_INDEX		equ			4	; int,  4 bytes
-COUNTS			equ			6	; int,  4 bytes
+COUNT			equ			6	; int,  4 bytes
 MODIFIED		equ			8	; bool, 1 byte
 MODIFIER		equ			10	; bool,	1 byte
 MAX_TIMES		equ			12	; int,  4 bytes
@@ -90,7 +91,6 @@ chk_quit:		; STM::: while(string[0] != QUIT)
 				beq			start
 
 				; Initialize variables
-;-------------------------------UNTESTED,START--------------------------------;
 init_vars:		; sum = 0
 				lea			sum,a2				; a2 holds address for `sum`
 				clr.w		(a2)
@@ -111,66 +111,83 @@ init_vars:		; sum = 0
 
 find_error:		; STM:::  string[s_index] != C_NULL && error == NO_ERROR
 				lea			s_index,a2			; a2 holds 's_index'
-				move.w		(a2),d1
+				move.b		(a2),d1
 				adda.w		d1,a1				; d1 = string[s_index]
 				move.b		(a1),d1
-				cmp.w		#C_NULL,d1
+				cmp.b		#C_NULL,d1
 				beq			check_error
 				
 				lea			error,a3			; a3 holds 'error'
-				move.w		(a3),d2				; d2 = error
-				cmp.w		#NO_ERROR,d2
+				move.b		(a3),d2				; d2 = error
+				cmp.b		#NO_ERROR,d2
 				bne			check_error
 				clr.w		d1
 				clr.w		d2
 
-				; while body: 
-				; r_index = MAX_ROMAN-1
+				; while body: r_index = MAX_ROMAN-1
 				lea			r_index,a2			; a2 points to r_index
-				move.w		#MAX_ROMANS-1,(a2)	; r_index now holds MAX_ROMANS-1
+				move.b		#MAX_ROMANS-1,(a2)	; r_index now holds MAX_ROMANS-1
 				
-prt_reverse:	; STM::: (r_index >= 0 && string[s_index] != all_roman[r_index].digit)
-				move.w			(a2),d1			; d1 holds value of `r_index`
-				cmp.w			#0,d1
-				blt				invalid_digit
-				 
-				lea				s_index,a3		; a3 points to `s_index`
-				move.w			(a3),d2			; d2 holds value of `s_index`
+				lea			string,a1			; a1 points toward start of 'string'
+				lea			s_index,a3			; a3 points to `s_index`
+				move.b		(a3),d2				; d2 holds value of `s_index`
+				move.b		#ROMAN_SIZE,d4		; d4 holds value of 'r_index' in ROMAN_SIZEs
 				
-				clr.l			d3
-				move.w			(a1,d2),d3		; d3 holds value of `string[s_index]`
-				cmp.w			DIGIT(a0,d1),d3
-				beq				invalid_digit
+ptr_reverse:	; STM::: (r_index >= 0 && string[s_index] != all_roman[r_index].digit)
 				
+				move.b		(a2),d1				; d1 holds value of `r_index`
+				tst			d1
+				blt			invalid_digit
+				
+				move.b		(a1,d2),d3			; d3 holds value of `string[s_index]`
+		
+				mulu.w		d1,d4				
+				cmp.w		DIGIT(a0,d4),d3
+				beq			invalid_digit
+				move.b		#ROMAN_SIZE,d4		
 				; BDY::: r_index--
-				sub.b 		#1,(a2)
-				bra			prt_reverse
-				
+				subq.b 		#1,(a2)
+				bra			ptr_reverse
+;-------------------------------UNTESTED,START--------------------------------;	
 invalid_digit:	; STM:::: r_index < 0
-				cmp.w		#0,d1
+				cmp.b		#0,d1
 				bge			index_GT_last
 				
-				; BDY::: error = 1
+				; BDY::: error = 1	=> invalid roman digit
 				lea			error,a3			
-				move.w		#1,(a3)
+				move.b		#1,(a3)
 
 index_GT_last: ; STM::: else if( r_index > r_last)
 				lea			r_last,a3			; a3 points to 'r_last`
-				cmp.w		(a3),d1
+				cmp.b		(a3),d1
 				ble			index_LE_last
 
 out_of_order:	;STM::: (all_roman[r_index].subtractor_index != r_last) || (all_roman[r_last].count > 1)				else1a2b:
-				move.w
+				clr.l		d2
+				move.b		(a3),d2				; d2 holds'r_last` value
 				
-				;BDY::: error = 2
+				cmp.b		SUB_INDEX(a0,d4),d2
+				beq			next_test
+				bra			error_body
 
-in_order: 		; STM:::
+next_test:		clr.l		d3
+				move.b		COUNT(a0,d2),d3
+				cmp.b		#1,d3
+				ble			in_order
+
+error_body:		;BDY::: error = 2
+				lea			error,a3
+				move.b		#2,d3
+				
+in_order: 		; STM::: else if(all_roman[r_index].modifier)
+
 				; BDY::: sum = sum + all_roman[r_index].arab_value - 2 * all_roman[r_last].arrab_value
 				;		(all_roman[all_roman[r_index].subtractor_index].count)--
 				;		all_roman[r_index].count++
 				;		all_roman[r_index].modified = TRUE
 				;		all_roman[all_roman[r_index].subtractor_index].modifier = TRUE
 				;		all_roman[all_roman[r_index].subtractor_index].modifier = TRUE
+
 index_LE_last: ; STM::: else
 
 
@@ -251,11 +268,17 @@ error:			ds.b		2
 				even
 
 ; Array of Structures:
-all_roman: 		dc.w		'I',1,-1,0,FALSE,FALSE,MAX_DIGIT_COUNT
+all_roman: 		dc.w		'I',1,-1,0,FALSE,FALSE,MAX_DIGIT_COUNT	
+				even
 				dc.w		'V',5,0,0,FALSE,FALSE,1
+				even
 				dc.w		'X',10,0,0,FALSE,FALSE,MAX_DIGIT_COUNT
+				even
 				dc.w		'L',50,2,0,FALSE,FALSE,1
+				even
 				dc.w		'C',100,2,0,FALSE,FALSE,MAX_DIGIT_COUNT
+				even
 				dc.w		'D',500,4,0,FALSE,FALSE,1
+				even
 				dc.w		'M',1000,4,0,FALSE,FALSE,MAX_DIGIT_COUNT
 				even
