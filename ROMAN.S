@@ -142,13 +142,13 @@ ptr_reverse:	; STM::: (r_index >= 0 && string[s_index] != all_roman[r_index].dig
 				move.b		(a1,d2),d3			; d3 holds value of `string[s_index]`
 		
 				mulu.w		d1,d4				
-				cmp.w		DIGIT(a0,d4),d3
+				cmp.w		DIGIT(a0,d4),d3		; d4 holds value of 'r_index' in ROMAN_SIZEs
 				beq			invalid_digit
 				move.b		#ROMAN_SIZE,d4		
 				; BDY::: r_index--
 				subq.b 		#1,(a2)
 				bra			ptr_reverse
-;-------------------------------UNTESTED,START--------------------------------;	
+;-------------------------------SEMI-UNTESTED,START: wokrs on expected values--------------------------------;	
 invalid_digit:	; STM:::: r_index < 0
 				cmp.b		#0,d1
 				bge			index_GT_last
@@ -156,7 +156,8 @@ invalid_digit:	; STM:::: r_index < 0
 				; BDY::: error = 1	=> invalid roman digit
 				lea			error,a3			
 				move.b		#1,(a3)
-
+				bra			check_error				; handle error
+				
 index_GT_last: ; STM::: else if( r_index > r_last)
 				lea			r_last,a3			; a3 points to 'r_last`
 				cmp.b		(a3),d1
@@ -166,23 +167,58 @@ out_of_order:	;STM::: (all_roman[r_index].subtractor_index != r_last) || (all_ro
 				clr.l		d2
 				move.b		(a3),d2				; d2 holds'r_last` value
 				
-				cmp.b		SUB_INDEX(a0,d4),d2
-				beq			next_test
-				bra			error_body
+				cmp.b		SUB_INDEX(a0,d4),d2	; d4 holds value of 'r_index' in ROMAN_SIZEs
+				bne			error_body
 
-next_test:		clr.l		d3
-				move.b		COUNT(a0,d2),d3
-				cmp.b		#1,d3
+				clr.l		d5
+				clr.l		d6
+				move.b		#ROMAN_SIZE,d5
+				mulu.w		d2,d5
+				move.b		COUNT(a0,d5),d6		; d6 = all_roman[r_last].count 		
+				cmp.b		#1,d6
 				ble			in_order
 
 error_body:		;BDY::: error = 2
-				lea			error,a3
-				move.b		#2,d3
+				lea			error,a3			; a3 points to 'error'					
+				move.b		#2,(a3)				; d3 holds 'error' value
+				bra			check_error
 				
-in_order: 		; STM::: else if(all_roman[r_index].modifier)
-
+in_order: 		; STM::: else 
+				
 				; BDY::: sum = sum + all_roman[r_index].arab_value - 2 * all_roman[r_last].arrab_value
+				lea			sum,a2
+				clr.l		d1
+				move.b		(a2),d1				; d1 = sum
+				
+				lea			r_index,a2			; a2 points to 'r_index`
+				clr.l		d2
+				move.b		(a2),d2
+				mulu.w		#ROMAN_SIZE,d2
+				add.w		ARAB_VAL(a0,d2),d1	
+				
+				lea			r_last,a2			
+				clr.l		d2
+				clr.l		d3
+				move.b		(a2),d2
+				mulu.w		#ROMAN_SIZE,d2
+				move.w		ARAB_VAL(a0,d2),d3	
+				mulu.w		#2,d3				
+				
+				sub.b		d3,d1
+				lea			sum,a2
+				move.b		d1,(a2)
+				
 				;		(all_roman[all_roman[r_index].subtractor_index].count)--
+				lea			r_index,a2			; a2 points to 'r_index`
+				clr.l		d2
+				clr.l		d3			
+				move.b		(a2),d2
+				mulu.w		#ROMAN_SIZE,d2
+				move.w		SUB_INDEX(a0,d2),d3 ; d3 = all_roman[r_index].subtractor_index
+				
+				mulu.w		#ROMAN_SIZE,d3
+				sub.w		#1,COUNT(a0,d3)
+				
 				;		all_roman[r_index].count++
 				;		all_roman[r_index].modified = TRUE
 				;		all_roman[all_roman[r_index].subtractor_index].modifier = TRUE
@@ -191,19 +227,9 @@ in_order: 		; STM::: else if(all_roman[r_index].modifier)
 index_LE_last: ; STM::: else
 
 
-find_error3:
 
-if1b2:
 
-else1b2:
-
-if1b2c:
-
-else1b2c:
-
-if1b: ; while no error increment s_index and reset r_last
-
-check_error:
+check_error:	; STM::: if (error)
 				clr.l		d1
 				lea			error,a2
 				move.w 		(a2),d1
