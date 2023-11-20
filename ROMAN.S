@@ -23,12 +23,13 @@
 ;		output: the decimal value of ROMAN number on the console	;		
 ;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++;
 ;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~;
-; PROGRAM STATUS: 													;
+; PROGRAM STATUS: Does not work reliably!, ASSEMBLEs fine but the 	;
+;		2nd run generates an address error when calling `read_char` ;
+;		subroutine again. Does print out correct decimal 			;
+;		value and invalid digit errors.								;
 ;																	;
-; TESTED ON VALUES:													;
+; TESTED ON VALUES: I,V,X,L,C,D,M									;
 ;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~;
-
-
 ;--------------------------Register Table---------------------------;
 ;	d0 = ONLY holds input and output data							;
 ;	d1-d7 = will hold variety of values, end of line 				;
@@ -36,8 +37,7 @@
 ;			in each Dn at the time.									;
 ;																	;
 ;	a0 = ONLY holds the address to the 'all_roman' array			;
-;	a1 = ONLY holds the address for the user input string			;
-;	a2-a4 = will point to various addresses, end of line 			;
+;	a1-a4 = will point to various addresses, end of line 			;
 ;			documentation will indicate wich address 				;
 ;			each An points to at the time							;
 ;-------------------------------------------------------------------;
@@ -51,6 +51,7 @@ CR				equ			13
 TAB				equ			9
 LF				equ			10
 NULL			equ			0
+ASCII_NUM		equ			'0'
 
 ; Boolean Constants
 TRUE			equ			1
@@ -75,16 +76,16 @@ C_NULL			equ			0
 QUIT			equ			'Q'
 
 				; Print Opening Lines:
-				lea			intro,a5
+				lea			intro,a1
 prt_intro:
-				move.b		(a5)+,d0
+				move.b		(a1)+,d0
 				beq			prt_rst
 				jsr			write_char
 				bra			prt_intro
 				
 				; prt_rst: Prints the rst_str to be called again every conversion
-prt_rst:		lea			rst_str,a5
-prt_loop:		move.b		(a5)+,d0
+prt_rst:		lea			rst_str,a1
+prt_loop:		move.b		(a1)+,d0
 				beq			start
 				jsr			write_char
 				bra			prt_loop
@@ -94,11 +95,11 @@ start:			lea			all_roman,a0		; a0 holds all_roman
 				lea			string,a1			; a1 holds string
 
 				; Clear 'string'
-				clr.l
+				clr.l		d1
 				move.b		#MAX_STRING+1,d1	; d1 holds length of 'string' acts as counter
 clr_str:		clr.b		(a1)+
 				dbra		d1,clr_str
-				clr.b		d1
+				clr.l		d1
 
 
 				; Read user Improved Roman Nnumeral notation 
@@ -122,7 +123,7 @@ chk_quit:		; STM::: while(string[0] != QUIT)
 init_vars:		; sum = 0
 				lea			sum,a2				; a2 holds address for `sum`
 				clr.w		(a2)
-
+				
 				; s_index = 0
 				lea			s_index,a2			; a2 holds address for `s_index`
 				clr.w		(a2)
@@ -138,6 +139,7 @@ init_vars:		; sum = 0
 				move.b		#NO_ERROR,(a2)
 
 find_error:		; STM:::  string[s_index] != C_NULL && error == NO_ERROR
+				lea			string,a1
 				lea			s_index,a2			; a2 holds 's_index'
 				move.b		(a2),d1
 				adda.w		d1,a1				; d1 = string[s_index]
@@ -156,7 +158,6 @@ find_error:		; STM:::  string[s_index] != C_NULL && error == NO_ERROR
 				lea			r_index,a2			; a2 points to r_index
 				move.b		#MAX_ROMANS-1,(a2)	; r_index now holds MAX_ROMANS-1
 				
-				lea			string,a1			; a1 points toward start of 'string'
 				lea			s_index,a3			; a3 points to `s_index`
 				move.b		(a3),d2				; d2 holds value of `s_index`
 				move.b		#ROMAN_SIZE,d4		; d4 holds value of 'r_index' in ROMAN_SIZEs
@@ -193,7 +194,7 @@ index_GT_last: ; STM::: else if( r_index > r_last)
 
 out_of_order:	;STM::: (all_roman[r_index].subtractor_index != r_last) || (all_roman[r_last].count > 1)				else1a2b:
 				clr.l		d2
-				move.b		(a3),d2				; d2 holds'r_last` value
+				move.b		(a3),d2				; d2 holds 'r_last' value
 				
 				cmp.b		SUB_INDEX(a0,d4),d2	; d4 holds value of 'r_index' in ROMAN_SIZEs
 				beq			order_error
@@ -208,15 +209,15 @@ out_of_order:	;STM::: (all_roman[r_index].subtractor_index != r_last) || (all_ro
 
 in_order: 		; STM::: else 
 				; BDY::: sum = sum + all_roman[r_index].arab_value - 2 * all_roman[r_last].arrab_value
-				lea			sum,a2
+				lea			sum,a2				; a2 points to 'sum'
 				clr.l		d1
 				move.b		(a2),d1				; d1 = sum
 				
-				lea			r_index,a2			; a2 points to 'r_index`
+				lea			r_index,a3			; a3 points to 'r_index`
 				clr.l		d2
-				move.b		(a2),d2
+				move.b		(a3),d2
 				mulu.w		#ROMAN_SIZE,d2
-				add.w		ARAB_VAL(a0,d2),d1	; d1 = d1 + all_roman[r_index].arab_value
+				add.w		ARAB_VAL(a0,d2),d1	; sum = sum + all_roman[r_index].arab_value
 				
 				lea			r_last,a2			; a2 points to 'r_last'
 				clr.l		d2
@@ -226,9 +227,8 @@ in_order: 		; STM::: else
 				move.w		ARAB_VAL(a0,d2),d3	; d3 = all_roman[r_last].arrab_value
 				mulu.w		#2,d3				
 				
-				sub.b		d3,d1
 				lea			sum,a2
-				move.b		d1,(a2)
+				sub.b		d3,(a2)
 				
 				; (all_roman[all_roman[r_index].subtractor_index].count)--
 				lea			r_index,a2			; a2 points to 'r_index`
@@ -306,7 +306,7 @@ legal_combo:		; STM::: else
 				clr.l		d1
 				; if (all_roman[r_index].count <= all_roman[r_index].max_times)
 				move.b		COUNT(a0,d2),d1		; d1 = all_roman[r_index].count
-				cmp.b		MAX_TIMES(a0,d2),d1
+				cmp.w		MAX_TIMES(a0,d2),d1
 				bgt			exceed_error
 				
 				; if-body::: sum = sum + all_roman[r_index].arab_value;
@@ -314,13 +314,13 @@ legal_combo:		; STM::: else
 				
 				lea			sum,a2
 				lea			r_last,a3
-				lea			r_index,a4
+				lea			r_index,a1
 				clr.l		d3
 				
-				move.b		ARAB_VAL(a0,d2),d3
-				add.b		d3,(a2)				; sum = sum + all_roman[r_index].arab_value;
+				move.w		ARAB_VAL(a0,d2),d3
+				add.w		d3,(a2)				; sum = sum + all_roman[r_index].arab_value;
 				
-				move.b		(a4),(a3)			; r_last = r_index;
+				move.b		(a1),(a3)			; r_last = r_index;
 				bra			cnt_read_input
 				
 exceed_error:	lea			error,a2
@@ -333,9 +333,9 @@ cnt_read_input:	; STM::: if (error == NO_ERROR)
 				cmp.b		#NO_ERROR,d1
 				bne			check_error
 				lea			s_index,a3
-				lea			r_last,a4
+				lea			r_last,a1
 				addq.b		#1,(a3)
-				addq.b		#1,(a4)
+				addq.b		#1,(a1)
 				bra			find_error
 
 check_error:	; STM::: if (error)
@@ -345,7 +345,8 @@ check_error:	; STM::: if (error)
 				cmp.b		#FALSE,d1
 				bne			case0
 				bra			prt_sum
-				
+
+;-------------End_Untested---------------				
 case0: 			; print error0 message
 				lea			error0,a2
 prt_case0:		move.b		(a2)+,d0
@@ -358,6 +359,7 @@ digit_place:	lea			s_index,a2
 				move.b		#'(',d0
 				jsr			write_char
 				move.b		(a2),d0
+				add.b		#'0',d0
 				jsr			write_char
 				move.b		#')',d0
 				jsr			write_char
@@ -414,17 +416,53 @@ prt_case:		move.b		(a2)+,d0
 				bra			prt_case
 
 prt_sum: 		; given digit is valid, print number
+				clr.l		d1						; holds 1000s place digit
+				clr.l		d2						; holds 100s place digit							
+				clr.l		d3						; holds	10s place digit
+				clr.l		d4						; holds 1s place digit
+				
 				lea			sum,a2
 				move.b		#CR,d0
 				jsr			write_char
 				move.b		#LF,d0
 				jsr 		write_char
+
+get_dig:		; separtes 'sum' into individual digit
+				move.w		(a2),d1
+				divu.w		#1000,d1
+				swap		d1
+				move.b		d1,d2
+				clr.w		d1
+				swap		d1					
 				
-loop_prt_sum:	move.b		(a2)+,d0
-				beq			clear_arr
+				divu.w		#100,d2
+				swap		d2
+				move.b		d2,d3
+				clr.w		d2
+				swap		d2
+				
+				divu.w		#10,d3
+				swap		d3
+				move.b		d3,d4
+				clr.w		d3
+				swap		d3
+			
+prt_1000s:		move.b		d1,d0
+				add.b		#ASCII_NUM,d0
 				jsr			write_char
-				bra			loop_prt_sum
 				
+prt_100s:		move.b		d2,d0
+				add.b		#ASCII_NUM,d0
+				jsr			write_char
+				
+prt_10s:		move.b		d3,d0
+				add.b		#ASCII_NUM,d0
+				jsr			write_char
+				
+prt_1s:			move.b		d4,d0
+				add.b		#ASCII_NUM,d0
+				jsr			write_char
+		
 clear_arr: 		; clear array modifiers and counts
 				clr.l		d1
 				move.b		#MAX_ROMANS,d1			; loop counter
@@ -440,16 +478,23 @@ loop_clear_arr:
 				dbra		d1,loop_clear_arr
 				
 re_prt:
-				clr.l	d0
-				lea		rst_str,a3
-				move.b	(a3)+,d0
-				beq		rst_bra
-				jsr		write_char
-				bra		re_prt
+				clr.l		d0
+				lea			rst_str,a3
+loop_re_prt:	move.b		(a3)+,d0
+				beq			rst_bra
+				jsr			write_char
+				bra			loop_re_prt
 
-rst_bra:		
-				bra 	start
-;-------------End_Untested---------------
+rst_bra:		clr.l		d0
+				clr.l		d1
+				clr.l		d2
+				clr.l		d3
+				clr.l		d4
+				clr.l		d5
+				clr.l		d6
+				clr.l		d7
+				
+				bra 		start
 
 end_prog:		jsr			exit
 
@@ -461,10 +506,10 @@ intro:			dc.b		"This program converts numbers in Improved Roman notation to Arab
 				even
 
 				; reset string to be printed at every reset of the string
-rst_str:		dc.b		CR,LF,TAB,"Input a Roman number (Press 'Q' to exit): ",NULL
+rst_str:		dc.b		CR,LF,"Input a Roman number (Press 'Q' to exit): ",NULL
 
 				; error message, to be printed at every occurence of an error in the program
-error0:			dc.b		CR,LF,TAB,"Character at position ",NULL
+error0:			dc.b		CR,LF,"Character at position ",NULL
 				
 				; conditional error messages to be printed at the occurence of unique error
 error1:			dc.b		CR,LF,TAB,"is not a valid Roman digit",CR,LF,NULL
